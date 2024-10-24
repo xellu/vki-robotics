@@ -4,6 +4,7 @@
 //change these values as needed
 const float wheelSize = 2.3; //in cm
 const float wheelBase = 18.9; //in cm
+const float clearance = 12.5; //i think those are cm but im not sure
 //---------
 
 float wheelPerimeter = 0;
@@ -46,7 +47,7 @@ void move(float cm, int power) {
     long currentB = startB;
 
     setMotorSpeed(motorB, power);
-    setMotorSpeed(motorC, power);
+    setMotorSpeed(motorD, power);
 
     int powerUsed = power;
     while (true) {
@@ -61,11 +62,11 @@ void move(float cm, int power) {
         if (currentB >= degreesNeeded) { powerUsed = 0; }
         
         setMotorSpeed(motorB, powerUsed);
-        setMotorSpeed(motorC, powerUsed);
+        setMotorSpeed(motorD, powerUsed);
 
-        float difference = getMotorEncoder(motorB) - getMotorEncoder(motorC);
+        float difference = getMotorEncoder(motorB) - getMotorEncoder(motorD);
         if (difference > 2) {
-            setMotorSpeed(motorC, powerUsed-2);
+            setMotorSpeed(motorD, powerUsed-2);
         }
         if (difference < -2) {
             setMotorSpeed(motorB, powerUsed-2);
@@ -83,7 +84,7 @@ void move(float cm, int power) {
 
 float rotate(float degrees) {
     long startB = getMotorEncoder(motorB);
-    long startC = getMotorEncoder(motorC);
+    long startC = getMotorEncoder(motorD);
     long distance = distanceToDegrees(((2*PI*turnRadius)/360)*degrees);
 
     long degreesNeededB = startB + distance;
@@ -94,28 +95,28 @@ float rotate(float degrees) {
     if (!fwdB) { mod = -1; } 
 
     setMotorSpeed(motorB, 50*mod);
-    setMotorSpeed(motorC, 50*-mod);
+    setMotorSpeed(motorD, 50*-mod);
 
     while (true) {
         currentB = getMotorEncoder(motorB);
 
         if ((currentB + 90 >= degreesNeededB && fwdB) || (currentB + 90 <= degreesNeededB && !fwdB)) {
             setMotorSpeed(motorB, 20*mod);
-            setMotorSpeed(motorC, 20*-mod);
+            setMotorSpeed(motorD, 20*-mod);
         }
 
 
         if ((currentB >= degreesNeededB && fwdB) || (currentB <= degreesNeededB && !fwdB)) {
             setMotorSpeed(motorB, 0);
-            setMotorSpeed(motorC, 0);
+            setMotorSpeed(motorD, 0);
             break;
         }
 
         delay(10);
     }
 
-    if (getMotorEncoder(motorC) > startC) {
-        return getMotorEncoder(motorC) - startC;
+    if (getMotorEncoder(motorD) > startC) {
+        return getMotorEncoder(motorD) - startC;
     }
     return getMotorEncoder(motorB) - startB;
 }
@@ -154,7 +155,7 @@ void setYaw(int degrees) {
 
 void tablePerimeter(int loops) {
     resetMotorEncoder(motorB);
-    resetMotorEncoder(motorC);
+    resetMotorEncoder(motorD);
     
     const int lenY = 210;
     const int lenX = 90;
@@ -174,17 +175,75 @@ void tablePerimeter(int loops) {
     delay(10000);
 }
 
+void pathFinder(int power) {
+    float rightDistance = -1;
+    float leftDistance = -1;
+
+    while (true) {
+        float distance = getUSDistance(S1);
+        displayTextLine(1, "distance=%f", distance);
+
+        setMotorSpeed(motorB, power);
+        setMotorSpeed(motorD, power);
+    
+        if (distance <= clearance || getTouchValue(S2)) {
+            setMotorSpeed(motorB, 0);
+            setMotorSpeed(motorD, 0);
+        
+            rotate(-90);
+            leftDistance = getUSDistance(S1);
+            rotate(180);
+            rightDistance = getUSDistance(S1);
+
+            if (rightDistance < clearance && leftDistance < clearance) {
+                rotate(90);
+            }
+
+            if (rightDistance < leftDistance) {
+                rotate(-180);
+            }
+
+
+        }
+
+        delay(10);
+    }
+}
+
+void wallBypass1337() {
+    int finalPhase = 0;
+    int moveMultiplier = 0;
+
+    while (true) {
+        if (!finalPhase) {
+            move(30, 100);
+            rotate(90);
+
+            moveMultiplier++;
+            
+            if (getUSDistance(S1) > clearance*3) {
+                finalPhase = 1;
+                continue;
+            }
+
+            rotate(-90);
+        }
+
+        if (finalPhase) {
+            move(30, 50);
+            rotate(90);
+            move(30*moveMultiplier, 100);
+            
+            break;
+        }
+    }
+}
+
 task main() {
     //do not remove
     wheelPerimeter = 2*PI*wheelSize;
     turnRadius = wheelBase/2;
     //-------------
-    /*
-    moveXY(-17, 30, 100);
-    moveXY(28, 38, 100);
-    moveXY(0, 0, 100);
 
-    setYaw(0);
-    */
-   tablePerimeter(1);
+    wallBypass1337();
 }
