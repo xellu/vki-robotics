@@ -3,7 +3,7 @@
 //n
 //change these values as needed
 const float wheelSize = 2.3; //in cm
-const float wheelBase = 18.5; //in cm
+const float wheelBase = 19; //in cm
 const float clearance = 12.5; //i think those are cm but im not sure
 const int useAlternate = 0 ; //whether to use alternative encoder for rotating (1 - enabled, 0 - disabled)
 
@@ -52,6 +52,8 @@ float normalize(float value, float maxValue, float minValue) {
 }
 
 void move(float cm, int power) {
+    if (cm < 0) { cm = cm*-1; }
+
     long startB = getMotorEncoder(motorA);
 
     long degreesNeeded = startB + distanceToDegrees(cm);
@@ -97,7 +99,7 @@ void infMove(int power) {
     int powerUsed = power;
     int distance;
     while (true) {
-        distance = getUSDistance(S2);
+        distance = getUSDistance(S4);
     
         if (distance <= clearance) {
             powerUsed = 0;
@@ -149,7 +151,7 @@ float rotate(float degrees) {
     while (true) {
         currentB = getMotorEncoder(motorA);
 
-        if ((currentB + 180 >= degreesNeededB && fwdB) || (currentB + 90 <= degreesNeededB && !fwdB)) {
+        if ((currentB + 180 >= degreesNeededB && fwdB) || (currentB - 180 <= degreesNeededB && !fwdB)) {
             setMotorSpeed(motorA, 20*mod);
             setMotorSpeed(motorB, 20*-mod);
         }
@@ -231,7 +233,7 @@ void objectEvasionSystem1337(int power) {
     float leftDistance = -1;
 
     while (true) {
-        float distance = getUSDistance(S2);
+        float distance = getUSDistance(S4);
         displayTextLine(1, "distance=%f", distance);
 
         setMotorSpeed(motorA, power);
@@ -250,9 +252,9 @@ void objectEvasionSystem1337(int power) {
             setMotorSpeed(motorB, 0);
         
             rotate(-90);
-            leftDistance = getUSDistance(S2);
+            leftDistance = getUSDistance(S4);
             rotate(180);
-            rightDistance = getUSDistance(S2);
+            rightDistance = getUSDistance(S4);
 
             if (rightDistance < clearance && leftDistance < clearance) {
                 rotate(90);
@@ -276,16 +278,19 @@ void mazeSolver(int walls) {
     int holePos[walls];
     int currentPos = 0;
 
+    //pathfind
     while (true) {
         if (!finalPhase) {
             rotate(90);
 
-            if (getUSDistance(S2) > clearance*3) {
+            if (getUSDistance(S4) > clearance*3) {
                 finalPhase = 1;
                 holePos[currentWall] = currentPos;
                 currentPos = 0;
                 continue;
             }
+
+            delay(100);
 
             rotate(-90);
             move(30, 100);
@@ -307,6 +312,27 @@ void mazeSolver(int walls) {
 
             finalPhase = 0;
         }
+    }
+
+    rotate(90);
+
+    //return to start
+    int i;
+    int currentPosT = 0;
+    for (i = 0; i < walls; i++) {
+        int nextHole = holePos[walls-i];
+        if (nextHole > currentPosT) {
+            rotate(90);
+        } else if (nextHole < currentPosT) {
+            rotate(-90);
+        }
+
+        move(30*(nextHole-currentPosT), 50);
+        rotate(-90);
+        infMove(50);
+        
+        currentPosT = nextHole;
+        displayTextLine(1, "i=%i, cpt=%i, nh=%i", i, currentPosT, nextHole);
     }
 }
 
@@ -350,6 +376,8 @@ task main() {
 
     //watchPFValues();
 
-    pathFinder(50);
+    //pathFinder(50);
+
+    mazeSolver(3);
 }
 
